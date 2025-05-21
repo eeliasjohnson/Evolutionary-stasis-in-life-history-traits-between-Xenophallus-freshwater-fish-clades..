@@ -1,0 +1,231 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+Data
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(rstatix)
+library(dplyr)
+library(car)
+library(lsmeans)
+library(lme4)
+library(lmerTest)
+library(tidyverse)
+library(ggplot2)
+library(rstatix)
+library(dplyr)
+library(car)
+library(lsmeans)
+library(effects)
+
+xenolhX <- read.csv("xeno.lh.data.csv")
+
+xenolh <- xenolhX %>%
+  filter(clade %in% c(1, 4))
+```
+
+New variables / Transformations
+```{r}
+
+as.data.frame(xenolh)
+
+xenolh$sqrte_count <- sqrt(xenolh$e_count)  
+
+xenolh$logmass_dry <- log(xenolh$mass_dry)
+
+xenolh$A <- as.numeric(xenolh$brood_mass)
+xenolh$logbrood_mass <- log(xenolh$A)
+
+xenolh$logsl <- log(xenolh$sl)
+
+xenolh$logGono <- log(xenolh$gono_length)
+
+xenolh$e_stage <- as.numeric(xenolh$e_stage)
+
+xenolh$clade <- as.factor(xenolh$clade)
+
+xenolh$loge_mass <- log(xenolh$e_mass)
+
+```
+
+Fecundity / drainage
+```{r}
+#actual model for clade
+m2a <- lmer(sqrte_count ~  clade + logsl + (1|site), data=xenolh)
+summary(m2a)
+
+#model for figure
+m2 <- lmer(sqrte_count ~  logsl + (1|site), data=xenolh)
+m2X <- Effect(c("logsl"), m2) 
+M2fit <- as.data.frame(cbind(m2X$x, m2X$fit))
+
+#scatter
+ggplot(xenolh) + 
+  geom_point(aes(x = logsl, y = sqrte_count, color = clade), alpha = 0.9, na.rm = TRUE) + 
+  geom_line(data=M2fit, aes(x=logsl, y=M2fit$`m2X$fit`), size = 1)+
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#boxplot
+ggplot(xenolh) + 
+  geom_boxplot(aes(x = clade, y = sqrte_count, color = clade), na.rm = TRUE, width = 0.6) + 
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#ggplot(xenolh) + 
+#  geom_boxplot(aes(x = clade, y = sqrte_count), na.rm = TRUE, width = 0.9) + 
+#  geom_jitter(aes(x = clade, y = sqrte_count),na.rm = TRUE, width = 0.16, alpha = .5, size = 0.8) + 
+#  labs(x = "clade", y = "Sqrt. Fecundity") + 
+#  theme_classic() 
+
+#Fecundity for each site
+xenolh$e_count <- as.numeric(as.character(xenolh$e_count))
+avg_ecount_site <- aggregate(e_count ~ site, data = xenolh, FUN = function(x) mean(x, na.rm = TRUE))
+print(avg_ecount_site)
+
+```
+
+Reproductive Allotment / drainage
+```{r}
+#actual model for clade
+m3a <- lmer(logbrood_mass ~ clade + logsl + (1|site), data=xenolh)
+summary(m3a)
+
+#model for figure
+m3 <- lmer(logbrood_mass ~  logsl + (1|site), data=xenolh)
+m3X <- Effect(c("logsl"), m3) 
+M3fit <- as.data.frame(cbind(m3X$x, m3X$fit))
+
+#scatter
+ggplot(xenolh) + 
+  geom_point(aes(x = logsl, y = logbrood_mass, color = clade), alpha = 0.9, na.rm = TRUE) + 
+  geom_line(data=M3fit, aes(x=logsl, y=M3fit$`m3X$fit`), size = 1) +
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#boxplot
+ggplot(xenolh) + 
+  geom_boxplot(aes(x = clade, y = logbrood_mass, color = clade), na.rm = TRUE, width = 0.6) + 
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#brood mass for each site
+xenolh$brood_mass <- as.numeric(as.character(xenolh$brood_mass))
+avg_broodmass_site <- aggregate(brood_mass ~ site, data = xenolh, FUN = function(x) mean(x, na.rm = TRUE))
+print(avg_broodmass_site)
+
+```
+
+Embryo Size / Stage
+```{r}
+#remove stage 3s
+xenolh1 <- xenolh %>%
+  filter(e_stage>3)
+
+#remove non dehydrated samples
+xenolh1 <- xenolh1 %>%
+  filter(e_mass <= 0.005 | is.na(e_mass))
+
+#actual model for clade
+m4a <- lmer(loge_mass ~ clade + logsl + (1|e_stage) + (1|site), data=xenolh1) 
+summary(m4a)
+
+#model for figure
+m4 <- lmer(loge_mass ~  logsl + e_stage + clade + (1|site), data=xenolh1) 
+m5X <- Effect(c( "e_stage"), m4) 
+M5fit <- as.data.frame(cbind(m5X$x, m5X$fit))
+summary(M5fit)
+
+#scatter (without site lines)
+ggplot(xenolh1, aes(x=e_stage, y=loge_mass))+
+  geom_line(data=M5fit, aes(x=e_stage, y=M5fit$`m5X$fit`), size = 1)+
+  geom_point(aes(color=clade))+
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  scale_x_continuous(limits = c(4, 10), breaks = seq(4, 10, by = 1)) +
+  theme_classic()
+
+#scatter (with site lines)
+ggplot(xenolh1, aes(x=e_stage, y=loge_mass))+
+  geom_line(data=M5fit, aes(x=e_stage, y=M5fit$`m5X$fit`), size = 1)+
+  geom_smooth(aes(group = site, color = clade), method = lm, se = FALSE, size = 0.3) +
+  geom_point(aes(color=clade))+
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  scale_x_continuous(limits = c(4, 10), breaks = seq(4, 10, by = 1)) +
+  theme_classic()
+
+#boxplot
+ggplot(xenolh1) + 
+  geom_boxplot(aes(x = clade, y = loge_mass, color = clade), na.rm = TRUE, width = 0.6) + 
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#calculate slopes for each site using lm() directly
+slopes <- xenolh1 %>%
+  group_by(site) %>%
+  do({
+    model <- lm(e_mass ~ e_stage, data = .)
+    slope <- coef(model)["e_stage"]
+    data.frame(slope)
+  }) %>%
+  ungroup()
+
+pop_slope <- slopes %>%
+  mutate(xenolha = xenolh$clade[match(site, xenolh$site)])
+
+# View the updated table
+print(pop_slope)
+
+m4emass <- lm(slope ~ xenolha , data = pop_slope)
+summary(m4emass)
+
+#Embryo mass for each site
+xenolh$e_mass <- as.numeric(as.character(xenolh$e_mass))
+avg_emass_site <- aggregate(e_mass ~ site, data = xenolh, FUN = function(x) mean(x, na.rm = TRUE))
+print(avg_emass_site)
+
+```
+
+Male size at maturity / drainage
+```{r}
+#filter only males 
+xenolh2 <- xenolh %>%
+  filter(sex == "M")
+
+#actual model for clade
+m6 <- lmer(logsl ~ clade + (1|site), data=xenolh2)
+summary(m6)
+
+#boxplot
+ggplot(xenolh2) + 
+  geom_boxplot(aes(x = clade, y = logsl, color = clade), na.rm = TRUE, width = 0.6) + 
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#Size at maturity for each site
+
+avg_sl_by_site <- aggregate(sl ~ site, data = xenolh2, FUN = mean, na.rm = TRUE)
+print(avg_sl_by_site)
+
+```
+
+gonopodium length / drainage
+```{r}
+#actual model for clade
+m7 <- lmer(logGono ~ clade + logsl + (1|site), data=xenolh2)
+summary(m7)
+
+#boxplot
+ggplot(xenolh2) + 
+  geom_boxplot(aes(x = clade, y = logGono, color = clade), na.rm = TRUE, width = 0.6) + 
+  scale_color_manual(values = c("4" = "#DE8344", "1" = "#4F71BE")) +
+  theme_classic() 
+
+#gonopodium length for each site
+avg_gono_by_site <- aggregate(gono_length ~ site, data = xenolh2, FUN = mean, na.rm = TRUE)
+print(avg_gono_by_site)
+
+mean(avg_gono_by_site$gono_length)
+
+```

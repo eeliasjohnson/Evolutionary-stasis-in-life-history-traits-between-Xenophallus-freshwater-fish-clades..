@@ -1,4 +1,4 @@
-# Evolutionary stasis in life history traits between *Xenophallus* freshwater fish clades isolated during Pliocene marine incursions
+# *Xenophallus* Life History Data
 
 Supplementary files to Johnson and Johnson (2025): Evolutionary stasis in life history traits between *Xenophallus* freshwater fish clades isolated during Pliocene marine incursions, including data and code to reproduce all results. Files include:
 
